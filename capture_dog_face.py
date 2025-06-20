@@ -4,17 +4,25 @@ import time
 import subprocess
 import termios  # For low-level terminal control (e.g., disabling line buffering)
 import tty      # For easily enabling raw terminal mode
-
+import csv
+from datetime import datetime
 
 # Start with "gomi" as the active dog
 current_dog = "gomi"
 
-# Base directory for all dog images
+# Base directory for all dog images and metadata file
 base_dir = "dog_images"
+metadata_file = os.path.join(base_dir, "metadata.csv")
 
 # Ensure dog-specific directories exist
 for dog_name in ["gomi", "millie"]:
     os.makedirs(os.path.join(base_dir, dog_name), exist_ok=True)
+    
+# Ensure metadata.csv exists with header
+if not os.path.exists(metadata_file):
+    with open(metadata_file, mode="w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["dog_name", "filename", "filepath", "timestamp"])
 
 # Get the next image index for a given dog (e.g., gomi_1.jpg → gomi_2.jpg)
 def get_next_index(dog_name):
@@ -29,11 +37,18 @@ def make_filename(dog_name):
     filename = f"{dog_name}_{index}.jpg"
     filepath = os.path.join(base_dir, dog_name, filename)
     print(f"[CAPTURE] Capturing {filepath}")
-    return filepath
+    return filepath, filename
+
+# Save metadata in csv file
+def save_metadata(dog_name, filename, filepath):
+    timestamp = datetime.now().isoformat()
+    with open(metadata_file, mode="a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([dog_name, filename, filepath, timestamp])
 
 # Capture image using the Raspberry Pi's rpicam-still command-line tool with autofocus
 def capture_image(dog_name):
-    filepath = make_filename(dog_name)
+    [filepath, filename] = make_filename(dog_name)
 
     # Run the rpicam-still command with autofocus and short delay to focus
     result = subprocess.run([
@@ -41,7 +56,7 @@ def capture_image(dog_name):
         "--output", filepath,   # Output file path
         "--timeout", "2000",    # Wait 2 seconds for autofocus                    
         "--width", "1280",      # Width 1280 px
-        "--height", "960"       # Height 960 px
+        "--height", "1280"       # Height 960 px
     ], capture_output=True, text=True)
     
     if result.returncode != 0:
@@ -49,6 +64,7 @@ def capture_image(dog_name):
         print("stderr:", result.stderr)
     else:
         print(f"[OK] Saved: {filepath}")
+        save_metadata(dog_name, filename, filepath)
 
 # Read a single key press without requiring ENTER (Unix only)
 def get_key():
