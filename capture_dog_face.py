@@ -46,11 +46,11 @@ def save_metadata(dog_name, filename, filepath):
         writer = csv.writer(f)
         writer.writerow([dog_name, filename, filepath, timestamp])
 
-# Capture image using the Raspberry Pi's rpicam-still command-line tool with autofocus
+# Capture image using the Raspberry Pi's rpicam-jpeg command-line tool with autofocus
 def capture_image(dog_name):
     [filepath, filename] = make_filename(dog_name)
 
-    # Run the rpicam-still command with autofocus and short delay to focus
+    # Run the rpicam-jpeg command with autofocus and short delay to focus
     result = subprocess.run([
         "rpicam-jpeg",
         "--output", filepath,   # Output file path
