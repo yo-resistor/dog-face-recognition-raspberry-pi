@@ -1,47 +1,92 @@
-from picamera2 import Picamera2
-import cv2
 import os
+import sys
+import time
+import subprocess
+import termios  # For low-level terminal control (e.g., disabling line buffering)
+import tty      # For easily enabling raw terminal mode
 
-# Folder to save images
+# Directory where images will be saved
 save_dir = "dog_images"
 os.makedirs(save_dir, exist_ok=True)
 
-# Helper to get the next index for filename
+# Start with "gomi" as the active dog
+current_dog = "gomi"
+
+# Get the next image index for a given dog (e.g., gomi_1.jpg → gomi_2.jpg)
 def get_next_index(dog_name):
     files = [f for f in os.listdir(save_dir) if f.startswith(dog_name) and f.endswith(".jpg")]
     indices = [int(f.split("_")[1].split(".")[0]) for f in files if "_" in f]
     return max(indices + [0]) + 1
 
-# Initialize camera
-picam2 = Picamera2()
-picam2.preview_configuration.main.size = (640, 480)
-picam2.preview_configuration.main.format = "RGB888"
-picam2.configure("preview")
-picam2.set_controls({"AfMode": 1})  # Enable continuous autofocus
-picam2.start()
+# Generate file name for image
+def make_filename(dog_name):
+    index = get_next_index(dog_name)
+    filename = f"{dog_name}_{index}.jpg"
+    print(f"[CAPTURE] Capturing {filename}")
+    
+    return os.path.join(save_dir, filename)
 
-# Dog name toggle
-current_dog = "gomi"
-print("Press [SPACE] to capture")
-print("Press [D] to switch between 'gomi' and 'millie'")
-print("Press [ESC] to quit")
+# Capture image using the Raspberry Pi's rpicam-still command-line tool with autofocus
+def capture_image(dog_name):
+    index = get_next_index(dog_name)
+    filename = f"{dog_name}_{index}.jpg"
+    filepath = make_filename(current_dog)
 
-while True:
-    frame = picam2.capture_array()
-    cv2.imshow("Dog Cam - Press SPACE to capture", frame)
+    # Run the rpicam-still command with autofocus and short delay to focus
+    result = subprocess.run([
+        "rpicam-jpeg",
+        "--output", filepath,   # Output file path
+        "--timeout", "2000",    # Wait 2 seconds for autofocus                    
+        "--width", "1280",      # Width 1280 px
+        "--height", "960"       # Height 960 px
+    ], capture_output=True, text=True)
+    
+    if result.returncode != 0:
+        print("[ERROR] Capture failed!")
+        print("stderr:", result.stderr)
+    else:
+        print(f"[OK] Saved: {filepath}")
 
-    key = cv2.waitKey(1)
-    if key == 27:  # ESC
-        break
-    elif key == 32:  # SPACE
-        idx = get_next_index(current_dog)
-        filename = f"{current_dog}_{idx}.jpg"
-        filepath = os.path.join(save_dir, filename)
-        # default is ~95 on OpenCV, but you can make it configurable.
-        cv2.imwrite("img.jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
-        print(f"📸 Saved: {filepath}")
-    elif key == ord("d"):
-        current_dog = "millie" if current_dog == "gomi" else "gomi"
-        print(f"🔁 Switched to: {current_dog}")
+# Read a single key press without requiring ENTER (Unix only)
+def get_key():
+    fd = sys.stdin.fileno()                    # Get the file descriptor for stdin (usually 0)
+    old_settings = termios.tcgetattr(fd)       # Save current terminal settings
 
-cv2.destroyAllWindows()
+    try:
+        tty.setraw(fd)                         # Set terminal to raw mode (immediate key detection)
+        ch = sys.stdin.read(1)                 # Read one character
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)  # Restore original terminal settings
+    return ch
+
+# Intro instructions
+print("[INFO] Press [SPACE] to capture")
+print("[INFO] Press [D] to switch dog (gomi/millie)")
+print("[INFO] Press [ESC] to quit")
+print("[INFO] Press [P] to preview for 5 seconds")
+
+# Main loop to handle key inputs
+try:
+    while True:    
+        key = get_key()
+
+        if key == "\x1b":  # ESC key (ASCII code for escape)
+            print("[EXIT] Exiting...")
+            break
+
+        elif key == " ":  # SPACE key
+            capture_image(current_dog)
+
+        elif key.lower() == "d":  # Toggle between "gomi" and "millie"
+            current_dog = "millie" if current_dog == "gomi" else "gomi"
+            print(f"[TOGGLE] Switched to: {current_dog}")
+            
+        elif key.lower() == "p":
+            print("[PREVIEW] Starting preview for 5 seconds...")
+            preview_proc = subprocess.Popen([
+                "rpicam-hello", "--timeout", "5000"  # 5 seconds
+            ])
+
+except KeyboardInterrupt:
+    # Graceful shutdown on Ctrl+C
+    print("\n[EXIT] Interrupted and exiting...")
