@@ -5,16 +5,21 @@ import subprocess
 import termios  # For low-level terminal control (e.g., disabling line buffering)
 import tty      # For easily enabling raw terminal mode
 
-# Directory where images will be saved
-save_dir = "dog_images"
-os.makedirs(save_dir, exist_ok=True)
 
 # Start with "gomi" as the active dog
 current_dog = "gomi"
 
+# Base directory for all dog images
+base_dir = "dog_images"
+
+# Ensure dog-specific directories exist
+for dog_name in ["gomi", "millie"]:
+    os.makedirs(os.path.join(base_dir, dog_name), exist_ok=True)
+
 # Get the next image index for a given dog (e.g., gomi_1.jpg → gomi_2.jpg)
 def get_next_index(dog_name):
-    files = [f for f in os.listdir(save_dir) if f.startswith(dog_name) and f.endswith(".jpg")]
+    dog_dir = os.path.join(base_dir, dog_name)
+    files = [f for f in os.listdir(dog_dir) if f.startswith(dog_name) and f.endswith(".jpg")]
     indices = [int(f.split("_")[1].split(".")[0]) for f in files if "_" in f]
     return max(indices + [0]) + 1
 
@@ -22,15 +27,13 @@ def get_next_index(dog_name):
 def make_filename(dog_name):
     index = get_next_index(dog_name)
     filename = f"{dog_name}_{index}.jpg"
-    print(f"[CAPTURE] Capturing {filename}")
-    
-    return os.path.join(save_dir, filename)
+    filepath = os.path.join(base_dir, dog_name, filename)
+    print(f"[CAPTURE] Capturing {filepath}")
+    return filepath
 
 # Capture image using the Raspberry Pi's rpicam-still command-line tool with autofocus
 def capture_image(dog_name):
-    index = get_next_index(dog_name)
-    filename = f"{dog_name}_{index}.jpg"
-    filepath = make_filename(current_dog)
+    filepath = make_filename(dog_name)
 
     # Run the rpicam-still command with autofocus and short delay to focus
     result = subprocess.run([
