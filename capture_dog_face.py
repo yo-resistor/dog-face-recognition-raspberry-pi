@@ -73,14 +73,11 @@ try:
         if key == "\x1b":  # ESC key (ASCII code for escape)
             print("[EXIT] Exiting...")
             break
-
         elif key == " ":  # SPACE key
             capture_image(current_dog)
-
         elif key.lower() == "d":  # Toggle between "gomi" and "millie"
             current_dog = "millie" if current_dog == "gomi" else "gomi"
             print(f"[TOGGLE] Switched to: {current_dog}")
-            
         elif key.lower() == "p":
             print("[PREVIEW] Starting preview for 5 seconds...")
             preview_proc = subprocess.Popen([
