@@ -22,9 +22,9 @@ picam2.start()
 
 # Dog name toggle
 current_dog = "gomi"
-print("🐶 Press [SPACE] to capture")
-print("🔁 Press [D] to switch between 'gomi' and 'millie'")
-print("❌ Press [ESC] to quit")
+print("Press [SPACE] to capture")
+print("Press [D] to switch between 'gomi' and 'millie'")
+print("Press [ESC] to quit")
 
 while True:
     frame = picam2.capture_array()
